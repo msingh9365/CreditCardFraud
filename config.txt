@@ -1,0 +1,4 @@
+[kafka]
+KAFKA_TOPIC = kf.topic.creditCard.transactions
+KAFKA_BOOTSTRAP_SERVERS = localhost:9092
+KAFKA_SOURCE_FILE = ./data/credit_card_fraud.json
