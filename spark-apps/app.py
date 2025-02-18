@@ -16,7 +16,7 @@ def process_batch(df: DataFrame, epoch_id):
     if fraud_df.count() > 0:
         fraud_df.write.format("json").mode("append").option("path", FRAUD_OUTPUT_PATH).save()
 
-    else:
+    if non_fraud_df.count() > 0:
         non_fraud_df.write.format("json").mode("append").option("path", NON_FRAUD_OUTPUT_PATH).save()
 
 
