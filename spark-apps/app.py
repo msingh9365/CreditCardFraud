@@ -3,14 +3,13 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, I
 from pyspark.sql.functions import col, from_json, regexp_replace, expr
 from pyspark.sql import DataFrame
 
-STREAM_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/stream"
 FRAUD_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/fraud_trans"
 NON_FRAUD_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/non_fraud_trans"
-FRAUD_CHECKPOINT_FOLDER = "/opt/spark/data/checkpoint/fraud"
-NON_FRAUD_CHECKPOINT_FOLDER = "/opt/spark/data/checkpoint/non_fraud"
 CHECKPOINT_DIR = "/opt/spark/data/checkpoint/stream"
+KAFKA_BOOTSTRAP_SERVER = "kafka:9092"
+KAFKA_TOPIC = "kf.topic.creditCard.transactions"
 
-def process_batch(df, epoch_id):
+def process_batch(df: DataFrame, epoch_id):
     fraud_df = df.filter(col("is_fraud") == 1)
     non_fraud_df = df.filter(col("is_fraud") == 0)
 
@@ -20,13 +19,6 @@ def process_batch(df, epoch_id):
     else:
         non_fraud_df.write.format("json").mode("append").option("path", NON_FRAUD_OUTPUT_PATH).save()
 
-def stream_writer(input: DataFrame, checkpoint_folder, output):
-    return input.writeStream \
-            .format('json') \
-            .option('checkpointLocation', checkpoint_folder) \
-            .option('path', output) \
-            .outputMode('append') \
-            .start()
 
 def read_from_kafka(spark):
     # Define the schema
@@ -51,13 +43,13 @@ def read_from_kafka(spark):
     df = spark \
         .readStream \
         .format("kafka") \
-        .option("kafka.bootstrap.servers", "kafka:9092") \
-        .option("subscribe", "kf.topic.creditCard.transactions") \
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVER) \
+        .option("subscribe", KAFKA_TOPIC) \
         .option("startingOffsets", "earliest") \
         .load()
 
     converted_df = df.select(col("value").cast("string").alias("json")) \
-                    .select(from_json(col("json"), schema, {"mode" : "FAILFAST"}).alias("data")) \
+                    .select(from_json(col("json"), schema).alias("data")) \
                     .select('data.*')
 
     query = converted_df.writeStream \
