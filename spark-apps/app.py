@@ -9,6 +9,7 @@ CHECKPOINT_DIR = "/opt/spark/data/checkpoint/stream"
 KAFKA_BOOTSTRAP_SERVER = "kafka:9092"
 KAFKA_TOPIC = "kf.topic.creditCard.transactions"
 
+
 def process_batch(df: DataFrame, epoch_id):
     fraud_df = df.filter(col("is_fraud") == 1)
     non_fraud_df = df.filter(col("is_fraud") == 0)
