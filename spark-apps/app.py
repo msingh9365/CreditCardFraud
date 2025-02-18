@@ -1,7 +1,7 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType, ArrayType
-from pyspark.sql.functions import col, from_json, regexp_replace, expr
 from pyspark.sql import DataFrame
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, from_json
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType
 
 FRAUD_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/fraud_trans"
 NON_FRAUD_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/non_fraud_trans"
@@ -45,8 +45,8 @@ def read_from_kafka(spark):
         .format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVER) \
         .option("subscribe", KAFKA_TOPIC) \
-        .option("startingOffsets", "earliest") \
         .load()
+        # .option("startingOffsets", "earliest")  add this to consume topic from the beginning
 
     converted_df = df.select(col("value").cast("string").alias("json")) \
                     .select(from_json(col("json"), schema).alias("data")) \
