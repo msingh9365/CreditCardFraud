@@ -23,7 +23,7 @@ def produce_kafka(file, producer, topic):
         for line in fin:
             value = json.loads(line)
             key = value['trans_num']
-            producer.produce(topic, key=key, value = json.dumps(line).encode('utf-8'), on_delivery = callback)
+            producer.produce(topic, key=key, value = json.dumps(value).encode('utf-8'), on_delivery = callback)
             producer.poll()
             sleep(1)
 
