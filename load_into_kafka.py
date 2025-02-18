@@ -14,8 +14,8 @@ def read_config(section):
             config_dict[key] = config[section][key]
 
         return config_dict
-    except Exception as e:
-        print(f"Error reading config file : {e}")
+    except Exception as ex:
+        print(f"Error reading config file : {ex}")
         return None
 
 def produce_kafka(file, producer, topic):
