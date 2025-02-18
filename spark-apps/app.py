@@ -47,23 +47,25 @@ def read_from_kafka(spark):
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVER) \
         .option("subscribe", KAFKA_TOPIC) \
         .load()
-        # .option("startingOffsets", "earliest")  add this to consume topic from the beginning
+    # .option("startingOffsets", "earliest")  add this to consume topic from the beginning
 
     converted_df = df.select(col("value").cast("string").alias("json")) \
-                    .select(from_json(col("json"), schema).alias("data")) \
-                    .select('data.*')
+        .select(from_json(col("json"), schema).alias("data")) \
+        .select('data.*')
 
     query = converted_df.writeStream \
-            .foreachBatch(process_batch) \
-            .option('checkpointLocation', CHECKPOINT_DIR) \
-            .outputMode('append') \
-            .start()
+        .foreachBatch(process_batch) \
+        .option('checkpointLocation', CHECKPOINT_DIR) \
+        .outputMode('append') \
+        .start()
 
     query.awaitTermination()
+
 
 def main():
     spark = SparkSession.builder.appName("CreditCardFraudApp").getOrCreate()
     read_from_kafka(spark)
 
-if __name__ == "__main__" :
+
+if __name__ == "__main__":
     main()
