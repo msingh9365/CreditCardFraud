@@ -42,8 +42,12 @@ services:
       - app-network
 
   spark:
+    depends_on:
+      - minio
     image: bitnami/spark:latest
     container_name: spark
+    env_file:
+      - .env
     environment:
       - SPARK_MODE=master
       - SPARK_MASTER_URL=local[2]
@@ -52,13 +56,76 @@ services:
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
       - SPARK_DAEMON_MEMORY=1g
+      - KAFKA_BOOTSTRAP_SERVER = ${KAFKA_BOOTSTRAP_SERVER}
+      - KAFKA_TOPIC = ${KAFKA_TOPIC}
+      - FRAUD_OUTPUT_PATH = ${FRAUD_OUTPUT_PATH}
+      - NON_FRAUD_OUTPUT_PATH = ${NON_FRAUD_OUTPUT_PATH}
+      - CHECKPOINT_DIR = ${NON_FRAUD_OUTPUT_PATH}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}  # Use the same credentials as mc
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} # Use the same credentials as mc
     ports:
       - "8080:8080"  # Web UI
+      - "4040:4040"
     volumes:
-      - ./spark-apps:/opt/spark/apps  # For your Spark applications
+      - ./src/jobs:/home/spark/jobs  # For your Spark applications
       - ./spark-data:/opt/spark/data  # For your data
     networks:
       - app-network
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    env_file:
+      - .env
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_DOMAIN=minio # This might not be strictly necessary in this setup.
+    ports:
+      - "9001:9001"  # Console
+      - "9000:9000"  # API
+    command: [ "server", "/data", "--console-address", ":9001" ]
+    volumes:
+      - ./minio_data:/data
+    networks:
+      app-network:
+        aliases:
+          - warehouse.minio
+
+
+  mc:
+    depends_on:
+      - minio
+    image: minio/mc
+    container_name: mc
+    env_file:
+      - .env
+    networks:
+      - app-network
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION} # Region is not strictly required for Minio, but can be set
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting for minio...' && sleep 1; done;
+      /usr/bin/mc rm -r --force minio/warehouse 2>/dev/null;
+      /usr/bin/mc mb minio/warehouse;
+      if [ -n \"\$AWS_BUCKET_NAME\" ]; then
+          /usr/bin/mc cp --recursive minio/\$AWS_BUCKET_NAME/ minio/warehouse/;
+      else
+          echo \"AWS_BUCKET_NAME environment variable is not set. Skipping copy.\";
+      fi;
+      if [ -n \"\$AWS_BUCKET_NAME\" ]; then
+          /usr/bin/mc rm -r --force minio/\$AWS_BUCKET_NAME 2>/dev/null;
+      else
+          echo \"AWS_BUCKET_NAME environment variable is not set. Skipping deletion.\";
+      fi;
+      tail -f /dev/null
+      "
+
+volumes:
+  minio_data:
 
 networks:
   app-network:

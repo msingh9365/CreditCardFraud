@@ -2,15 +2,18 @@ from pyspark.sql import DataFrame
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, from_json
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType
+import os
 
-FRAUD_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/fraud_trans"
-NON_FRAUD_OUTPUT_PATH = "/opt/spark/data/CreditCardTrans/non_fraud_trans"
-CHECKPOINT_DIR = "/opt/spark/data/checkpoint/stream"
-KAFKA_BOOTSTRAP_SERVER = "kafka:9092"
-KAFKA_TOPIC = "kf.topic.creditCard.transactions"
+FRAUD_OUTPUT_PATH = os.environ.get('FRAUD_OUTPUT_PATH')
+NON_FRAUD_OUTPUT_PATH = os.environ.get('NON_FRAUD_OUTPUT_PATH')
+CHECKPOINT_DIR = os.environ.get('CHECKPOINT_DIR')
+KAFKA_BOOTSTRAP_SERVER = os.environ.get('KAFKA_BOOTSTRAP_SERVER')
+KAFKA_TOPIC = os.environ.get('KAFKA_TOPIC')
+AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
 
-def process_batch(df: DataFrame, epoch_id):
+def process_batch(df: DataFrame, _):
     fraud_df = df.filter(col("is_fraud") == 1)
     non_fraud_df = df.filter(col("is_fraud") == 0)
 
@@ -46,6 +49,7 @@ def read_from_kafka(spark):
         .format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVER) \
         .option("subscribe", KAFKA_TOPIC) \
+        .option("startingOffsets", "earliest") \
         .load()
     # .option("startingOffsets", "earliest")  add this to consume topic from the beginning
 
@@ -63,7 +67,20 @@ def read_from_kafka(spark):
 
 
 def main():
-    spark = SparkSession.builder.appName("CreditCardFraudApp").getOrCreate()
+    spark = SparkSession \
+        .builder \
+        .appName("CreditCardFraudApp") \
+        .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
+        .config("spark.hadoop.fs.s3a.access.key", AWS_ACCESS_KEY_ID) \
+        .config("spark.hadoop.fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY) \
+        .config("spark.hadoop.fs.s3a.path.style.access", "true") \
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
+        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false") \
+        .config("spark.hadoop.fs.s3a.bucket.auto.create", "true") \
+        .config('spark.hadoop.fs.s3a.aws.credentials.provider',
+                'org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider') \
+        .getOrCreate()
+
     read_from_kafka(spark)
 
 
